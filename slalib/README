@@ -1,0 +1,6 @@
+clone of https://github.com/scottransom/pyslalib.git with deleted unnesessary files
+
+just do make && su -c "make install"
+
+don't use header file slalib.h still it's wrong
+
