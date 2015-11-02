@@ -33,7 +33,7 @@ struct SHM_Block {
 	uint8_t *addr;            // connection address
 };
 
-extern struct SHM_Block sdat;
+extern volatile struct SHM_Block sdat;
 
 /*
  * Command queue descriptor
@@ -788,7 +788,7 @@ struct BTA_Data {
 	uint32_t pep_code_di, pep_code_do; // dome PEP codes
 };
 
-extern struct BTA_Data *sdt;
+extern volatile struct BTA_Data *sdt;
 
 /*******************************************************************************
 *                       Local data structure                                   *
@@ -819,7 +819,7 @@ struct my_msgbuf {
 	char mtext[100];  // message itself
 };
 
-extern struct BTA_Local *sdtl;
+extern volatile struct BTA_Local *sdtl;
 extern int snd_id;
 extern int cmd_src_pid;
 extern uint32_t cmd_src_ip;
@@ -831,12 +831,12 @@ extern uint32_t cmd_src_ip;
 void bta_data_init();
 int  bta_data_check();
 void bta_data_close();
-int get_shm_block( struct SHM_Block *sb, int server);
-int close_shm_block(struct SHM_Block *sb);
-void get_cmd_queue( struct CMD_Queue *cq, int server);
+int get_shm_block(volatile struct SHM_Block *sb, int server);
+int close_shm_block(volatile struct SHM_Block *sb);
+void get_cmd_queue(struct CMD_Queue *cq, int server);
 #endif
 
-int check_shm_block( struct SHM_Block *sb);
+int check_shm_block(volatile struct SHM_Block *sb);
 
 void encode_lev_passwd(char *passwd, int nlev, uint32_t *keylev, uint32_t *codlev);
 int find_lev_passwd(char *passwd, uint32_t *keylev, uint32_t *codlev);

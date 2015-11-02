@@ -13,10 +13,10 @@ static char msg[80];
 #define PERR(...)  do{sprintf(msg, __VA_ARGS__); perror(msg);} while(0)
 
 #ifndef BTA_MODULE
-struct BTA_Data *sdt;
-struct BTA_Local *sdtl;
+volatile struct BTA_Data *sdt;
+volatile struct BTA_Local *sdtl;
 
-struct SHM_Block sdat = {
+volatile struct SHM_Block sdat = {
 	{"Sdat"},
 	sizeof(struct BTA_Data),
 	2048,0444,
@@ -97,7 +97,7 @@ void bta_data_close() {
 /**
  * Allocate shared memory segment
  */
-int get_shm_block( struct SHM_Block *sb, int server) {
+int get_shm_block(volatile struct SHM_Block *sb, int server) {
 	int getsize = (server)? sb->maxsize : sb->size;
 	// first try to find existing one
 	sb->id = shmget(sb->key.code, getsize, sb->mode);
@@ -135,7 +135,7 @@ int get_shm_block( struct SHM_Block *sb, int server) {
 	return 1;
 }
 
-int close_shm_block(struct SHM_Block *sb){
+int close_shm_block(volatile struct SHM_Block *sb){
 	int ret;
 	if(sb->close != NULL)
 		sb->close();
@@ -179,7 +179,7 @@ void get_cmd_queue(struct CMD_Queue *cq, int server){
 #endif // BTA_MODULE
 
 
-int check_shm_block( struct SHM_Block *sb) {
+int check_shm_block(volatile struct SHM_Block *sb) {
 	if(sb->check)
 		return(sb->check());
 	else return(0);

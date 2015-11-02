@@ -684,7 +684,7 @@ int main(int argc, char **argv){
 	if(showinfo != NO_INFO) bta_print(showinfo, GP->infoargs);
 	else if(GP->listinfo) bta_print(NO_INFO, NULL); // show arguments available
 #define RUN(arg)     do{if(!arg) retcode = 1;}while(0)
-#define RUNBLK(arg)  do{if(!arg) return 1;}while(0)
+#define RUNBLK(arg)  do{if(!arg){retcode = 1; goto restoring;}}while(0)
 	if(GP->telstop)      RUN(stop_telescope());
 	if(GP->eqcrds)       RUNBLK(setCoords(GP->eqcrds, TRUE));
 	else if(GP->horcrds) RUNBLK(setCoords(GP->horcrds, FALSE));
@@ -700,6 +700,7 @@ int main(int argc, char **argv){
 	else if(GP->corrRAD) RUN(run_correction(GP->corrRAD, FALSE));
 #undef RUN
 #undef RUNBLK
+restoring:
 	unlink(PIDFILE);
 	restore_console();
 	return retcode;
