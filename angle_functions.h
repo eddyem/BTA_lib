@@ -24,6 +24,8 @@
 
 #include <stdbool.h>
 
+#define BUFSZ 255
+
 #ifndef TRUE
 	#define TRUE true
 #endif
@@ -32,6 +34,9 @@
 	#define FALSE false
 #endif
 
+char *time_asc(double t);
+char *angle_asc(double a);
+char *angle_fmt(double a, char *format);
 double sec_to_degr(double sec);
 char *get_degrees(double *ret, char *str);
 bool calc_AP(double r, double d, double *appRA, double *appDecl);

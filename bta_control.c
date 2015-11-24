@@ -52,9 +52,9 @@ glob_pars *GP = NULL;
 #ifdef EMULATION
 #define ACS_CMD(a)   do{green(#a); printf("\n");}while(0)
 #else
-#define ACS_CMD(a)   do{red(#a); printf("\n");}while(0)
+//#define ACS_CMD(a)   do{red(#a); printf("\n");}while(0)
 // Uncomment only in final release
-// #define ACS_CMD(a)   do{DBG(#a "\n"); a; }while(0)
+#define ACS_CMD(a)   do{DBG(#a "\n"); a; }while(0)
 #endif
 
 
@@ -120,10 +120,9 @@ void set_timeout(int delay){
 char indi[] = "|/-\\";
 char *iptr = indi;
 #define WAIT_EVENT(evt, max_delay)  do{int __ = 0; set_timeout(max_delay); \
-		PRINT(" "); while(!tmout && !evt){\
+		PRINT(" "); while(!tmout && !(evt)){ \
 		usleep(100000); if(!*(++iptr)) iptr = indi; if(++__%10==0) PRINT("\b. "); \
 		PRINT("\b%c", *iptr);}; PRINT("\n");}while(0)
-
 
 #ifndef EMULATION
 void get_passhash(passhash *p){
@@ -198,21 +197,33 @@ void get_passhash(passhash *p){
  * move P2 to the given angle relative to current position +- P2_ANGLE_THRES
  */
 void cmd_P2moveto(double p2shift){
-	double p2vel = 45.*60., p2dt, p2mintime = 4.5, p2secs = fabs(p2shift) * 3600.;
+	double p2vel = 45.*60., p2dt, p2mintime = P2_MINTIME, p2secs = fabs(p2shift) * 3600.;
 	if(fabs(p2shift) < P2_ANGLE_THRES) return;
 	p2dt = p2secs / p2vel;
 	if(p2dt < p2mintime){
 		p2vel = p2secs / p2mintime;
-		if(p2vel < 1.) p2vel = 1;
+		if(p2vel < 1.) p2vel = 1.;
 		p2dt = p2secs / p2vel;
 	}
+	// if speed is too fast, make dt less
+	if(p2vel > P2_FAST_SPEED && p2dt > P2_FAST_T_CORR + P2_MINTIME){
+		p2dt -= P2_FAST_T_CORR;
+	}
 	if(p2shift < 0) p2vel = -p2vel;
-	DBG("p2vel=%g, p2dt = %g", p2vel, p2dt);
+	DBG("p2vel=%g, p2dt = %g, p2_val=%s", p2vel, p2dt, angle_asc(val_P));
 	ACS_CMD(MoveP2To(p2vel, p2dt));
 #ifndef EMULATION
+	PRINT(_("Wait for starting"));
+	WAIT_EVENT(((fabs(vel_P) > 1.) && (P2_State != P2_Off)), WAITING_TMOUT);
+	if((fabs(vel_P) < 1.) || (P2_State == P2_Off)){
+		DBG("vel: %g, state: %d", vel_P, P2_State);
+		WARNX(_("P2 didn't start!"));
+		return;
+	}
 	PRINT(_("Moving P2 "));
 	// wait until P2 stops, set to guiding or timeout ends
-	WAIT_EVENT(((fabs(vel_P) < 1.) || (P2_State == P2_On)), p2dt + 1.);
+	WAIT_EVENT(((fabs(vel_P) < 1.) && (P2_State == P2_Off)), p2dt + 1.);
+	DBG("P2 state: %d, vel_P: %g, p2_val=%s", P2_State, vel_P, angle_asc(val_P));
 	if(tmout && P2_State != P2_Off){
 		WARNX(_("Timeout reached, stop P2"));
 		ACS_CMD(MoveP2(0));
@@ -276,7 +287,7 @@ bdrg:
 #ifndef EMULATION
 		if(P2_State != P2_Off){
 			PRINT(_("Wait for P2 stop "));
-			WAIT_EVENT(P2_State == P2_Off, 5);
+			WAIT_EVENT(P2_State == P2_Off, WAITING_TMOUT);
 			if(tmout && P2_State != P2_Off){
 				WARNX(_("Timeout reached, can't stop P2"));
 				return 0;
@@ -284,13 +295,15 @@ bdrg:
 		}
 #endif
 	}
+	int p2oldmode = P2_Mode;
+	ACS_CMD(SetPMode(P2_Off));
 	DBG("Move P2 to %gdegr", p2angle);
 	if(fabs(p2angle - p2val) < P2_ANGLE_THRES){
 		WARNX(_("Zero moving (< %g)"), P2_ANGLE_THRES);
 		return TRUE;
 	}
 	int i;
-	for(i = 0; i < 3; ++i){
+	for(i = 0; i < 5; ++i){
 		if(i) PRINT(_("Try %d. "), i+1);
 		cmd_P2moveto(p2angle - p2val);
 		p2val = sec_to_degr(val_P);
@@ -300,6 +313,8 @@ bdrg:
 		WARNX(_("Error moving P2: have %gdegr, need %gdegr"), p2val, p2angle);
 		return FALSE;
 	}
+	PRINT(_("All OK, current P2 value: %s\n"), angle_asc(val_P));
+	ACS_CMD(SetPMode(p2oldmode));
 	return TRUE;
 }
 
@@ -317,7 +332,7 @@ bool setP2mode(char *arg){
 #ifndef EMULATION
 	if(P2_State != mode){
 		PRINT(_("Wait for given mode "));
-		WAIT_EVENT(P2_State == mode, 5);
+		WAIT_EVENT(P2_State == mode, WAITING_TMOUT);
 		if(tmout && P2_State != mode){
 			WARNX(_("Timeout reached, can't set P2 mode"));
 			return FALSE;
@@ -334,13 +349,13 @@ void cmd_Fmoveto(double f){
 	const double FOC_HVEL = 0.63, FOC_LVEL = 0.13;
 	int _U_ fspeed;
 	if(f < 1. || f > 199.) return;
-	double fshift = f - val_F, fvel, _U_ fdt;
+	double fshift = f - val_F, fvel, fdt;
 	if(fabs(fshift) > 1.){
 		fvel = FOC_HVEL;
-		fspeed = (fshift > 0) ? Foc_Hplus : Foc_Hminus;
-	}else if(fabs(fshift) > 0.05){
+		fspeed = (fshift > 0.) ? Foc_Hplus : Foc_Hminus;
+	}else if(fabs(fshift) > FOCUS_THRES){
 		fvel = FOC_LVEL;
-		fspeed = (fshift > 0) ? Foc_Lplus : Foc_Lminus;
+		fspeed = (fshift > 0.) ? Foc_Lplus : Foc_Lminus;
 	} else{
 		WARNX(_("Can't move for such small distance (%gmm)"), fshift);
 		return;
@@ -348,8 +363,15 @@ void cmd_Fmoveto(double f){
 	fdt = fabs(fshift) / fvel;
 	ACS_CMD(MoveFocus(fspeed, fdt));
 #ifndef EMULATION
+	DBG("dt: %g, fvel: %g, fstate: %d, F:%g", fdt, vel_F, Foc_State, val_F);
+	PRINT(_("Wait for starting"));
+	WAIT_EVENT((Foc_State != Foc_Off || fabs(vel_F) > 0.01), WAITING_TMOUT);
 	PRINT(_("Moving Focus "));
-	WAIT_EVENT((fabs(vel_F) < 0.01 || Foc_State == Foc_Off), fdt + 1.);
+	WAIT_EVENT((fabs(vel_F) < 0.01 && Foc_State == Foc_Off), fdt + 1.);
+	DBG("fvel: %g, fstate: %d, F:%g", vel_F, Foc_State, val_F);
+	PRINT(_("Wait for stop"));
+	WAIT_EVENT((Foc_State == Foc_Off && fabs(vel_F) < 0.01), WAITING_TMOUT);
+	DBG("fvel: %g, fstate: %d, F:%g", vel_F, Foc_State, val_F);
 	if(tmout && Foc_State != Foc_Off){
 		WARNX(_("Timeout reached, stop focus"));
 		ACS_CMD(MoveFocus(Foc_Off, 0.));
@@ -374,7 +396,7 @@ bool moveFocus(double val){
 #ifndef EMULATION
 	if(Foc_State != Foc_Off){
 		PRINT(_("Wait for focus stop "));
-		WAIT_EVENT(Foc_State == Foc_Off, 3);
+		WAIT_EVENT(Foc_State == Foc_Off, WAITING_TMOUT);
 		if(tmout && Foc_State != Foc_Off){
 			WARNX(_("Timeout reached, can't stop focus motor"));
 			return FALSE;
@@ -443,12 +465,17 @@ bool setCoords(char *coords, bool isEQ){
 		// calculate apparent place according to other cmdline arguments
 		if(!calc_AP(r, d, &appRA, &appDecl)) goto badcrds;
 		DBG("Set RA/Decl to %g, %g", appRA/3600, appDecl/3600);
+		r = InpAlpha, d = InpDelta; // save old coordinates
 		ACS_CMD(SetRADec(appRA, appDecl));
 #ifndef EMULATION
-		if(InpAlpha != r || InpDelta != d){
+		DBG("InpAlpha = %g, InpDelta = %g, was: A = %g, D = %g",
+			InpAlpha, InpDelta, r, d);
+		// now check whether old coordinates was changed
+		if(fabs(InpAlpha - r) > INPUT_COORDS_THRES || fabs(InpDelta - d) > INPUT_COORDS_THRES){
 			PRINT(_("Wait for command result"));
-			WAIT_EVENT((InpAlpha == r && InpDelta == d), 3);
-			if(InpAlpha != r || InpDelta != d){
+			WAIT_EVENT((fabs(InpAlpha - r) < INPUT_COORDS_THRES &&
+					fabs(InpDelta - d) < INPUT_COORDS_THRES), WAITING_TMOUT);
+			if(tmout){
 				WARNX(_("Can't send data to system!"));
 				return FALSE;
 			}
@@ -462,10 +489,11 @@ bool setCoords(char *coords, bool isEQ){
 		DBG("Set A/Z to %g, %g", r/3600, d/3600);
 		ACS_CMD(SetAzimZ(r, d));
 #ifndef EMULATION
-		if(InpAzim != r || InpZdist != d){
+		if(fabs(InpAzim - r) > INPUT_COORDS_THRES || fabs(InpZdist - d) > INPUT_COORDS_THRES){
 			PRINT(_("Wait for command result"));
-			WAIT_EVENT((InpAzim == r && InpZdist == d), 3);
-			if(InpAzim != r || InpZdist != d){
+			WAIT_EVENT((fabs(InpAzim - r) < INPUT_COORDS_THRES &&
+					fabs(InpZdist - d) < INPUT_COORDS_THRES), WAITING_TMOUT);
+			if(tmout){
 				WARNX(_("Can't send data to system!"));
 				return FALSE;
 			}
@@ -487,12 +515,13 @@ badcrds:
 bool azreverce(){
 	bool ret = TRUE;
 	int mode = Az_Mode;
+	DBG("mode: %d", mode);
 	if(mode == Rev_Off) mode = Rev_On;
-	else mode = Rev_On;
+	else mode = Rev_Off;
 	ACS_CMD(SetAzRevers(mode));
 	PRINT(_("Turn %s azimuth reverce "), (mode == Rev_Off) ? "off" : "on");
 #ifndef EMULATION
-	WAIT_EVENT((Az_Mode == mode), 3);
+	WAIT_EVENT((Az_Mode == mode), WAITING_TMOUT);
 	if(Az_Mode != mode) ret = FALSE;
 #endif
 	return ret;
@@ -500,7 +529,7 @@ bool azreverce(){
 
 bool testauto(){
 	if(Tel_Mode != Automatic){
-		WARNX(_("Can't stop telescope: not automatic mode!"));
+		WARNX(_("Not automatic mode!"));
 		return FALSE;
 	}
 	return TRUE;
@@ -513,7 +542,7 @@ bool stop_telescope(){
 		return TRUE;
 	}
 	ACS_CMD(StopTeleskope());
-	WAIT_EVENT((Sys_Mode == SysStop), 3);
+	WAIT_EVENT((Sys_Mode == SysStop), WAITING_TMOUT);
 	if(Tel_Mode != SysStop){
 		WARNX(_("Can't stop telescope"));
 		return FALSE;
@@ -539,18 +568,19 @@ bool gotopos(bool isradec){
 		ACS_CMD(SetSysTarg(TagPosition));
 	}
 	DBG("start");
-	usleep(500000);
 	ACS_CMD(StartTeleskope());
+	usleep(500000);
 #ifndef EMULATION
 	PRINT("Go");
-	WAIT_EVENT((Sys_Mode != SysStop && Sys_Mode != SysWait), 5);
+	WAIT_EVENT((Sys_Mode != SysStop && Sys_Mode != SysWait), WAITING_TMOUT);
 	if(tmout){
 		WARNX(_("Can't move telescope"));
+		ACS_CMD(StopTeleskope());
 		return FALSE;
 	}
 	PRINT("Wait for tracking");
 	//  Wait with timeout 15min
-	WAIT_EVENT((Sys_Mode == SysTrkOk), 900);
+	WAIT_EVENT((Sys_Mode == SysTrkOk), 900.);
 	if(tmout){
 		WARNX(_("Eror during telescope pointing"));
 		return FALSE;
@@ -573,7 +603,7 @@ bool PCS_state(bool on){
 		ACS_CMD(SwitchPosCorr(PC_Off));
 	}
 #ifndef EMULATION
-		WAIT_EVENT((Pos_Corr == newstate), 3);
+		WAIT_EVENT((Pos_Corr == newstate), WAITING_TMOUT);
 		if(tmout){
 			WARNX(_("Can't set new PCS state"));
 			return FALSE;
@@ -595,24 +625,33 @@ bool run_correction(char *dxdy, bool isAZ){
 	if(!myatod(&dy, &eptr)) goto badang;
 	DBG("dx: %g, dy: %g", dx, dy);
 	if(!testauto() || dx > CORR_MAX_ANGLE || dy > CORR_MAX_ANGLE) return FALSE;
+	int32_t oldmode = Sys_Mode;
 	if(isAZ){
+		dx /= sin(val_Z * AS2R); // transform dA to "telescope coordinates"
 #ifndef EMULATION
-		double targA = val_A+dx, targZ = val_Z+dy;
+		//double targA = val_A+dx, targZ = val_Z+dy;
 #endif
-		ACS_CMD(DoAZcorr(dx / sin(val_Z * AS2R), dy));// transform dA to "telescope coordinates"
+		ACS_CMD(DoAZcorr(dx, dy));
 #ifndef EMULATION
-		WAIT_EVENT((fabs(val_A - targA) < CORR_THRES && fabs(val_Z - targZ) < CORR_THRES), 10);
+		PRINT(_("Wait for A/Z correction ends"));
+		//WAIT_EVENT((fabs(val_A - targA) < CORR_THRES && fabs(val_Z - targZ) < CORR_THRES), 10.);
 #endif
 	}else{
 #ifndef EMULATION
-		double targA = val_Alp+dx, targD = val_Del+dy;
+		//double targA = val_Alp+dx, targD = val_Del+dy;
 #endif
 		ACS_CMD(DoADcorr(dx, dy));
 #ifndef EMULATION
-		WAIT_EVENT((fabs(val_Alp - targA) < CORR_THRES && fabs(val_Del - targD) < CORR_THRES), 10);
+		//WAIT_EVENT((fabs(val_Alp - targA) < CORR_THRES && fabs(val_Del - targD) < CORR_THRES), 10.);
 #endif
 	}
 #ifndef EMULATION
+	PRINT(_("Wait for correction starts"));
+	WAIT_EVENT(Sys_Mode != oldmode, 10.);
+	if(tmout) goto atmout;
+	PRINT(_("Wait for correction ends"));
+	WAIT_EVENT(Sys_Mode == oldmode, 150.);
+atmout:
 	if(tmout){
 		WARNX(_("Can't do correction (or angle is too large)"));
 		return FALSE;

@@ -32,6 +32,8 @@
 #include "angle_functions.h"
 #include "usefull_macros.h"
 
+static char buf[BUFSZ+1];
+
 extern void sla_caldj(int*, int*, int*, double*, int*);
 extern void sla_amp(double*, double*, double*, double*, double*, double*);
 extern void sla_map(double*, double*, double*, double*, double*,double*, double*, double*, double*, double*);
@@ -268,3 +270,63 @@ baddate:
 	return FALSE;
 }
 
+char *time_asc(double t){
+	int h, min;
+	double sec;
+	h   = (int)(t/3600.);
+	min = (int)((t - (double)h*3600.)/60.);
+	sec = t - (double)h*3600. - (double)min*60.;
+	h %= 24;
+	if(sec>59.99) sec=59.99;
+	snprintf(buf, BUFSZ, "%02d:%02d:%05.2f", h,min,sec);
+	return buf;
+}
+
+char *angle_asc(double a){
+	char s;
+	int d, min;
+	double sec;
+	if (a >= 0.)
+		s = '+';
+	else {
+		s = '-'; a = -a;
+	}
+	d   = (int)(a/3600.);
+	min = (int)((a - (double)d*3600.)/60.);
+	sec = a - (double)d*3600. - (double)min*60.;
+	d %= 360;
+	if(sec>59.9) sec=59.9;
+	snprintf (buf, BUFSZ, "%c%02d:%02d:%04.1f", s,d,min,sec);
+	return buf;
+}
+
+char *angle_fmt(double a, char *format){
+	char s, *p;
+	int d, min, n;
+	double sec, msec;
+	char *newformat = MALLOC(char, strlen(format) + 3);
+	sprintf(newformat, "%s", format);
+	if (a >= 0.)
+		s = '+';
+	else {
+		s = '-'; a = -a;
+	}
+	d   = (int)(a/3600.);
+	min = (int)((a - (double)d*3600.)/60.);
+	sec = a - (double)d*3600. - (double)min*60.;
+	d %= 360;
+	if ((p = strchr(format,'.')) == NULL)
+		msec=59.;
+	else if (*(p+2) == 'f' ) {
+		n = *(p+1) - '0';
+		msec = 60. - pow(10.,(double)(-n));
+	} else
+		msec=60.;
+	if(sec>msec) sec=msec;
+	if (strstr(format,"%c"))
+		snprintf(buf, BUFSZ, newformat, s,d,min,sec);
+	else
+		snprintf(buf, BUFSZ, newformat, d,min,sec);
+	free(newformat);
+	return buf;
+}

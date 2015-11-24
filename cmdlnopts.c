@@ -83,6 +83,7 @@ myoption cmdlnopts[] = {
 	end_option
 };
 
+
 /**
  * Parce command line options and return dynamically allocated structure
  * 		to global parameters

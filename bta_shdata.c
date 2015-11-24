@@ -9,8 +9,9 @@ struct CMD_Queue ocmd = {{"Ocmd"}, 0200,0,-1,0};
 // User command channel (level 2/3)
 struct CMD_Queue ucmd = {{"Ucmd"}, 0200,0,-1,0};
 
-static char msg[80];
-#define PERR(...)  do{sprintf(msg, __VA_ARGS__); perror(msg);} while(0)
+#define MSGLEN  (80)
+static char msg[MSGLEN];
+#define PERR(...)  do{snprintf(msg, MSGLEN, __VA_ARGS__); perror(msg);} while(0)
 
 #ifndef BTA_MODULE
 volatile struct BTA_Data *sdt;
@@ -127,8 +128,7 @@ int get_shm_block(volatile struct SHM_Block *sb, int server) {
 		PERR("Can't prevents swapping of shared memory segment '%s'",sb->key.name);
 		return 0;
 	}
-	DBG("Create & attach shared memory segment '%s' %dbytes at %lx",
-		sb->key.name, sb->size, (uint64_t)sb->addr);
+	DBG("Create & attach shared memory segment '%s' %dbytes", sb->key.name, sb->size);
 	sb->side = server;
 	if(sb->init != NULL)
 		sb->init();
