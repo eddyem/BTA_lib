@@ -106,6 +106,8 @@ typedef enum{
 	PAR_SrcDelta,
 	PAR_InpAlpha,
 	PAR_InpDelta,
+	PAR_TelAlpha,
+	PAR_TelDelta,
 	PAR_CurAzim,
 	PAR_CurZenD,
 	PAR_InpAzim,
@@ -176,6 +178,8 @@ const parstr const parameters_str[] = {
 	{"SrcDelta", PAR_SrcDelta},
 	{"InpAlpha", PAR_InpAlpha},
 	{"InpDelta", PAR_InpDelta},
+	{"TelAlpha", PAR_TelAlpha},
+	{"TelDelta", PAR_TelDelta},
 	{"CurAzim", PAR_CurAzim},
 	{"CurZenD", PAR_CurZenD},
 	{"InpAzim", PAR_InpAzim},
@@ -543,13 +547,17 @@ int bta_print(info_level lvl, char *par_list){
 	}
 /************************* BASIC_COORDS ***************************************/
 	if(lvl & BASIC_COORDS){ // basic coordinates: cur, src, inp, tel
-		SMSG(CurAlpha, "current", time_asc(CurAlpha));
-		SMSG(CurDelta, "current", angle_asc(CurDelta));
-		SMSG(SrcAlpha, "source", time_asc(SrcAlpha));
-		SMSG(SrcDelta, "source", angle_asc(SrcDelta));
-		SMSG(InpAlpha, "input", time_asc(InpAlpha));
-		SMSG(InpDelta, "input", angle_asc(InpDelta));
-
+		// Target: object, show A/D
+		if(Sys_Target == TagObject){
+			SMSG(CurAlpha, "current", time_asc(CurAlpha));
+			SMSG(CurDelta, "current", angle_asc(CurDelta));
+			SMSG(SrcAlpha, "last source position", time_asc(SrcAlpha));
+			SMSG(SrcDelta, "last source position", angle_asc(SrcDelta));
+			SMSG(InpAlpha, "last input value", time_asc(InpAlpha));
+			SMSG(InpDelta, "last input value", angle_asc(InpDelta));
+			SMSG(TelAlpha, "real telescope", time_asc(val_Alp));
+			SMSG(TelDelta, "real telescope", angle_asc(val_Del));
+		}
 		SMSG(CurAzim, "current", angle_fmt(tag_A,"%c%03d:%02d:%04.1f"));
 		SMSG(CurZenD, "current", angle_fmt(tag_Z,"%02d:%02d:%04.1f"));
 		SMSG(InpAzim, "input", angle_fmt(InpAzim,"%c%03d:%02d:%04.1f"));

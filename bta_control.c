@@ -558,7 +558,7 @@ bool gotopos(bool isradec){
 	if(Sys_Mode != SysStop && !stop_telescope()) return FALSE;
 	if(isradec){
 		if((fabs(val_A - InpAzim) < Amove && fabs(val_Z - InpZdist) < Zmove)){ // move back to last coords
-				ACS_CMD(MoveToObject());
+			ACS_CMD(MoveToObject());
 		}else{
 			ACS_CMD(GoToObject());
 		}
