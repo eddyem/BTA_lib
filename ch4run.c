@@ -76,33 +76,14 @@ void iffound_default(pid_t pid){
  * @param pidfilename - name of pidfile or NULL if none
  * @param iffound - action to run if file found or NULL for exit(0)
  */
-void check4running(char **argv, char *pidfilename, void (*iffound)(pid_t pid)){
+void check4running(char *pidfilename, void (*iffound)(pid_t pid)){
 	DIR *dir;
-	FILE *pidfile, *fself;
+	FILE *pidfile;
 	struct dirent *de;
 	struct stat s_buf;
 	pid_t pid = 0, self;
-	struct flock fl;
 	char *name, *myname;
 	if(!iffound) iffound = iffound_default;
-	if(argv){ // block self
-		fself = fopen(argv[0], "r"); // open self binary to lock
-		memset(&fl, 0, sizeof(struct flock));
-		fl.l_type = F_WRLCK;
-		if(fcntl(fileno(fself), F_GETLK, &fl) == -1){ // check locking
-			perror("fcntl");
-			exit(1);
-		}
-		if(fl.l_type != F_UNLCK){ // file is locking - exit
-			printf("Found locker, PID = %d!\n", fl.l_pid);
-			exit(1);
-		}
-		fl.l_type = F_RDLCK;
-		if(fcntl(fileno(fself), F_SETLKW, &fl) == -1){
-			perror("fcntl");
-			exit(1);
-		}
-	}
 	self = getpid(); // get self PID
 	if(!(dir = opendir(PROC_BASE))){ // open /proc directory
 		perror(PROC_BASE);

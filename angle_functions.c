@@ -160,7 +160,7 @@ char *get_degrees(double *ret, char *str){
 	int res;
 	while(*str){ // check sign & omit leading shit
 		char c = *str;
-		if(c > '0'-1 && c < '9'+1) break;
+		if(c >= '0' && c <= '9') break;
 		++str;
 		if(c == '+') break;
 		if(c == '-'){ sign = -1.; break;}

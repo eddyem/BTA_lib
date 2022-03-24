@@ -137,6 +137,9 @@ typedef enum{
 	PAR_CorrAzim,
 	PAR_CorrZenD,
 	PAR_Foc_State,
+	PAR_polarX,
+	PAR_polarY,
+	PAR_DUT1,
 	PAR_ValTout,
 	PAR_ValTind,
 	PAR_ValTmir,
@@ -620,6 +623,10 @@ int bta_print(info_level lvl, char *par_list){
 			}
 		}
 		SMSG(Foc_State, "focus motor state", value);
+
+		FMSG(polarX, "X polar motion", "%g", polarX);
+		FMSG(polarY, "Y polar motion", "%g", polarY);
+		FMSG(DUT1, "UT1 - UTC", "%g", DUT1);
 	}
 /************************** METEO_INFO ****************************************/
 	if(lvl & METEO_INFO){

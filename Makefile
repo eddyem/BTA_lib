@@ -1,7 +1,8 @@
 PROGRAM = bta_control
 LDFLAGS = -lcrypt -lm -lsla
-SRCS = bta_shdata.c bta_control.c cmdlnopts.c parceargs.c usefull_macros.c ch4run.c
-SRCS += angle_functions.c bta_print.c
+#SRCS = bta_shdata.c bta_control.c cmdlnopts.c parceargs.c usefull_macros.c ch4run.c
+#SRCS += angle_functions.c bta_print.c
+SRCS = $(wildcard *.c)
 CC = gcc
 DEFINES = -D_XOPEN_SOURCE=666 -DEBUG
 #-DEMULATION

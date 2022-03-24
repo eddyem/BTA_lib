@@ -25,4 +25,4 @@
 #include <unistd.h>  // pid_t
 
 void iffound_default(pid_t pid);
-void check4running(char **argv, char *pidfilename, void (*iffound)(pid_t pid));
+void check4running(char *pidfilename, void (*iffound)(pid_t pid));
